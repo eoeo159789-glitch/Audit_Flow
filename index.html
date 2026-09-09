@@ -18,6 +18,8 @@
 <button class="nav-btn" data-view="evidence">📎　證據管理</button>
 <button class="nav-btn" data-view="procedures">☑　查核程序</button>
 <button class="nav-btn" data-view="workpaper">📄　工作底稿</button>
+<button class="nav-btn" data-view="relations">🕸　案件關聯圖</button>
+<button class="nav-btn" data-view="attachments">📎　附件資料</button>
         <button class="nav-btn" data-view="findings">⌕　查核發現</button>
         <button class="nav-btn" data-view="backup">⇩　備份與還原</button>
       </nav>
@@ -78,6 +80,27 @@
       <section id="workpaper" class="view">
         <div class="page-title"><div><h1>審計工作底稿</h1><p>依案件資料自動彙整，可列印或另存 PDF。</p><button id="printWorkpaperBtn" class="primary">🖨 列印／另存 PDF</button></div></div>
         <div id="workpaperContent" class="workpaper"></div>
+      </section>
+
+      <section id="relations" class="view">
+        <div class="page-title">
+          <div><h1>案件關聯視覺化</h1><p>從問題出發，檢視原因、查核程序、證據與查核發現的關聯。</p></div>
+          <div class="top-actions"><button id="relationRefreshBtn">↻ 重新整理</button></div>
+        </div>
+        <section class="card">
+          <div class="relation-help">點選「問題」可切換不同案件問題；圖中節點會顯示目前已建立的關聯資料。</div>
+          <div id="relationControls" class="relation-controls"></div>
+          <div id="relationGraph" class="relation-graph"></div>
+        </section>
+      </section>
+
+      <section id="attachments" class="view">
+        <div class="page-title">
+          <div><h1>附件資料</h1><p>附件會以檔案方式儲存在目前瀏覽器中，可關聯問題、證據或查核程序。</p></div>
+          <button class="primary" id="addAttachmentBtn">＋ 上傳附件</button>
+        </div>
+        <div class="attachment-note">⚠️ 為避免 LocalStorage 容量不足，建議附件以小型文件、圖片或必要摘要為主；大型檔案請保留於你的受控儲存位置。</div>
+        <div id="attachmentList" class="attachment-grid"></div>
       </section>
       <section id="findings" class="view">
         <div class="page-title"><div><h1>查核發現</h1><p>串聯問題、證據、法規依據與改善建議。</p></div><button class="primary" id="addFindingBtn">＋ 新增查核發現</button></div>
