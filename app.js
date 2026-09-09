@@ -1,6 +1,10 @@
 const KEY="auditflow_v2_offline";
+// ---- AI 分析（Gemini API，BYOK：金鑰只存在使用者自己的瀏覽器） ----
+const GEMINI_KEY_STORAGE="auditflow_gemini_api_key";
+const GEMINI_MODEL="gemini-3.8-flash"; // 若 Google 更新模型名稱，改這裡即可
+const GEMINI_ENDPOINT="https://generativelanguage.googleapis.com/v1beta/interactions";
 const $=s=>document.querySelector(s), uid=()=>Date.now().toString(36)+Math.random().toString(36).slice(2,7);
-let data=load(),activeCaseId=null,modalContext=null;
+let data=load(),activeCaseId=null,modalContext=null,aiSelectedIssueId=null;
 function load(){try{const d=JSON.parse(localStorage.getItem(KEY)||localStorage.getItem("auditflow_offline_v1"));if(d?.cases)return d}catch(e){}return{cases:[]}}
 function esc(s=""){return String(s).replace(/[&<>"']/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[m]))}
 function save(){localStorage.setItem(KEY,JSON.stringify(data));renderAll()}
@@ -53,6 +57,81 @@ function renderRelations(){
  </div>`;
 }
 window.selectRelationIssue=id=>{relationIssueId=id;renderRelations()}
+
+// ---- AI 分析 ----
+function geminiKey(){return localStorage.getItem(GEMINI_KEY_STORAGE)||""}
+function renderGeminiKeyStatus(){
+ let k=geminiKey(),el=$("#geminiKeyStatus");if(!el)return;
+ if(k){el.textContent=`✓ 已儲存金鑰（${k.slice(0,4)}${"•".repeat(Math.max(k.length-8,0))}${k.slice(-4)}），僅存於此瀏覽器`;el.classList.remove("empty")}
+ else{el.textContent="尚未設定 API 金鑰，AI 分析功能無法使用";el.classList.add("empty")}
+}
+function renderAiIssueControls(){
+ let el=$("#aiIssueControls");if(!el)return;
+ let c=active(),issues=c.issues||[];
+ if(!issues.length){el.innerHTML=empty("請先建立至少一個問題，才能使用 AI 分析。");aiSelectedIssueId=null;return}
+ aiSelectedIssueId=issues.some(i=>i.id===aiSelectedIssueId)?aiSelectedIssueId:issues[0].id;
+ el.innerHTML=issues.map((i,n)=>`<button class="${i.id===aiSelectedIssueId?"active":""}" onclick="selectAiIssue('${i.id}')">P-${String(n+1).padStart(3,"0")} ${esc(i.title)}</button>`).join("");
+}
+window.selectAiIssue=id=>{aiSelectedIssueId=id;renderAiIssueControls()}
+function buildAuditPrompt(c,issue){
+ let evs=c.evidence.filter(e=>e.issueId===issue.id),procs=c.procedures.filter(p=>p.issueId===issue.id),finds=c.findings.filter(f=>[f.issueId,f.relatedIssueId].includes(issue.id));
+ let whys=[1,2,3,4,5].filter(n=>issue["why"+n]).map(n=>`Why ${n}：${issue["why"+n]}`).join("\n");
+ let fish=["人員","制度","流程","法規","預算","資料","管理","其他"].filter(x=>issue["fish_"+x]).map(x=>`${x}：${issue["fish_"+x]}`).join("\n");
+ return `你是一位資深內部稽核（審計）顧問。請根據以下審計案件的問題分析資料，用繁體中文提供專業意見，內容包含：
+1. 對目前 5-Why 分析與根本原因的評論，是否合理、是否有遺漏的角度
+2. 建議可以補充的查核程序（具體、可執行）
+3. 風險等級評估與理由（高／中／低）
+4. 具體可行的改善建議
+
+請只根據下方提供的資料進行分析，不要編造資料中沒有的具體數字、日期或事實；若資料不足以判斷，請直接說明需要補充哪些資訊。請用條列方式回答。
+
+【案件名稱】${c.name}
+【受查單位】${c.agency||"未填寫"}
+【查核期間】${c.period||"未填寫"}
+
+【問題標題】${issue.title}
+【問題描述】${issue.description||"未填寫"}
+【問題分類】${issue.category||"未填寫"}
+【目前風險等級】${issue.risk||"未填寫"}
+【處理狀態】${issue.status||"未填寫"}
+
+【5-Why 分析】
+${whys||"尚未填寫"}
+
+【目前根本原因】
+${issue.rootCause||"尚未填寫"}
+
+【魚骨分析】
+${fish||"尚未填寫"}
+
+【相關查核程序】
+${procs.length?procs.map(p=>`- ${p.title}（${p.status}）：目的：${p.objective||"未填寫"}；結果：${p.result||"未填寫"}`).join("\n"):"尚無關聯查核程序"}
+
+【相關證據】
+${evs.length?evs.map(e=>`- ${e.code} ${e.title}：${e.description||"未填寫"}`).join("\n"):"尚無關聯證據"}
+
+【相關查核發現】
+${finds.length?finds.map(f=>`- ${f.title}：${f.problem||"未填寫"}`).join("\n"):"尚無關聯查核發現"}`;
+}
+async function callGemini(prompt){
+ let key=geminiKey();
+ if(!key)throw new Error("尚未設定 Gemini API 金鑰，請先在上方輸入並儲存。");
+ let res;
+ try{
+  res=await fetch(GEMINI_ENDPOINT,{
+   method:"POST",
+   headers:{"Content-Type":"application/json","x-goog-api-key":key},
+   body:JSON.stringify({model:GEMINI_MODEL,system_instruction:"你是一位嚴謹、專業的內部稽核顧問，只根據使用者提供的資料進行分析，不編造未提及的具體事實。",input:prompt,generation_config:{thinking_level:"low"}})
+  });
+ }catch(networkErr){
+  throw new Error("無法連線到 Gemini API。請檢查網路連線；若持續失敗，可能是瀏覽器 CORS 政策擋下了跨網域請求，屆時需要改用後端代理伺服器轉發請求。");
+ }
+ let body=null;try{body=await res.json()}catch(e){}
+ if(!res.ok){throw new Error(`Gemini API 回傳錯誤（HTTP ${res.status}）：${body?.error?.message||"請確認金鑰是否正確、額度是否足夠。"}`)}
+ let text=(body?.steps||[]).filter(s=>s.type==="model_output").flatMap(s=>s.content||[]).filter(c=>c.type==="text").map(c=>c.text).join("\n").trim();
+ if(!text)throw new Error("Gemini 沒有回傳可用的文字內容，請稍後再試一次。");
+ return text;
+}
 function attachmentForm(a={}){
  let c=active();
  const opts=(arr,selected,label)=>`<option value="">未關聯</option>`+arr.map(x=>`<option value="${x.id}" ${x.id===selected?"selected":""}>${esc(x[label])}</option>`).join("");
@@ -73,7 +152,7 @@ window.downloadAttachment=id=>{
 }
 window.editAttachment=id=>attachmentForm(active().attachments.find(x=>x.id===id));
 
-function renderAll(){ensureCase();renderSelector();renderDashboard();renderTimeline();renderIssues();renderEvidence();renderProcedures();renderFindings();renderAttachments();renderRelations();renderWorkpaper()}
+function renderAll(){ensureCase();renderSelector();renderDashboard();renderTimeline();renderIssues();renderEvidence();renderProcedures();renderFindings();renderAttachments();renderRelations();renderWorkpaper();renderAiIssueControls();renderGeminiKeyStatus()}
 function openModal(title,html,ctx){modalContext=ctx;$("#modalTitle").textContent=title;$("#modalForm").innerHTML=html;$("#modal").classList.remove("hidden")}
 function closeModal(){$("#modal").classList.add("hidden")}
 function field(n,l,v="",type="text",cls=""){return type==="textarea"?`<div class="field ${cls}"><label>${l}</label><textarea name="${n}">${esc(v)}</textarea></div>`:`<div class="field ${cls}"><label>${l}</label><input type="${type}" name="${n}" value="${esc(v)}"></div>`}
@@ -98,4 +177,21 @@ $("#newCaseBtn").onclick=()=>caseForm();$("#addAttachmentBtn").onclick=()=>attac
 document.querySelectorAll(".nav-btn").forEach(b=>b.onclick=()=>showView(b.dataset.view));document.querySelectorAll("[data-view-go]").forEach(b=>b.onclick=()=>showView(b.dataset.viewGo));function showView(v){document.querySelectorAll(".view").forEach(x=>x.classList.toggle("active",x.id===v));document.querySelectorAll(".nav-btn").forEach(x=>x.classList.toggle("active",x.dataset.view===v))}
 window.editEvent=id=>eventForm(active().events.find(x=>x.id===id));window.editIssue=id=>issueForm(active().issues.find(x=>x.id===id));window.editFinding=id=>findingForm(active().findings.find(x=>x.id===id));window.editEvidence=id=>evidenceForm(active().evidence.find(x=>x.id===id));window.editProcedure=id=>procedureForm(active().procedures.find(x=>x.id===id));window.deleteItem=(key,id)=>{if(confirm("確定刪除？")){active()[key]=active()[key].filter(x=>x.id!==id);save()}};
 $("#exportBtn").onclick=()=>{let b=new Blob([JSON.stringify(data,null,2)],{type:"application/json"}),a=document.createElement("a");a.href=URL.createObjectURL(b);a.download=`AuditFlow_V2_Backup_${new Date().toISOString().slice(0,10)}.json`;a.click();URL.revokeObjectURL(a.href);toast("備份已匯出")};$("#importBtn").onclick=()=>$("#importFile").click();$("#importFile").onchange=async e=>{let f=e.target.files[0];if(!f)return;try{let p=JSON.parse(await f.text());if(!Array.isArray(p.cases))throw 0;if(confirm("匯入將覆蓋目前資料，確定嗎？")){data=p;activeCaseId=p.cases[0]?.id;save();toast("資料已還原")}}catch{x=0;alert("檔案格式不正確")}};$("#clearAllBtn").onclick=()=>{if(confirm("確定永久清除？")){data={cases:[]};activeCaseId=null;localStorage.removeItem(KEY);renderAll()}};
-$("#printWorkpaperBtn").onclick=()=>window.print();renderAll();
+$("#printWorkpaperBtn").onclick=()=>window.print();
+$("#saveGeminiKeyBtn").onclick=()=>{let v=$("#geminiKeyInput").value.trim();if(!v)return toast("請先輸入金鑰");localStorage.setItem(GEMINI_KEY_STORAGE,v);$("#geminiKeyInput").value="";renderGeminiKeyStatus();toast("金鑰已儲存在此瀏覽器")};
+$("#clearGeminiKeyBtn").onclick=()=>{if(confirm("確定要清除已儲存的 Gemini API 金鑰嗎？")){localStorage.removeItem(GEMINI_KEY_STORAGE);renderGeminiKeyStatus();toast("金鑰已清除")}};
+$("#runAiAnalysisBtn").onclick=async()=>{
+ let c=active(),issue=c.issues.find(x=>x.id===aiSelectedIssueId);
+ if(!issue)return toast("請先選擇要分析的問題");
+ let resultEl=$("#aiResult"),btn=$("#runAiAnalysisBtn");
+ resultEl.className="ai-result loading";resultEl.textContent="AI 分析中，請稍候…（依內容長度可能需要數秒到數十秒）";btn.disabled=true;
+ try{
+  let text=await callGemini(buildAuditPrompt(c,issue));
+  resultEl.className="ai-result";resultEl.innerHTML=esc(text);
+ }catch(err){
+  resultEl.className="ai-result error";resultEl.textContent=err.message||"分析失敗，請稍後再試。";
+ }finally{
+  btn.disabled=false;
+ }
+};
+renderAll();
