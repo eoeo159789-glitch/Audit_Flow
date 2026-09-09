@@ -1,0 +1,102 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>AuditFlow 離線智慧審計工作平台</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <div class="app-shell">
+    <aside class="sidebar">
+      <div class="brand"><div class="brand-icon">⌁</div><div><strong>AuditFlow</strong><span>離線智慧審計工作平台</span></div></div>
+      <button class="new-case" id="newCaseBtn">＋ 新增案件</button>
+      <nav>
+        <button class="nav-btn active" data-view="dashboard">▦　案件總覽</button>
+        <button class="nav-btn" data-view="timeline">◷　大事記</button>
+        <button class="nav-btn" data-view="issues">⚠　問題分析</button>
+<button class="nav-btn" data-view="evidence">📎　證據管理</button>
+<button class="nav-btn" data-view="procedures">☑　查核程序</button>
+<button class="nav-btn" data-view="workpaper">📄　工作底稿</button>
+        <button class="nav-btn" data-view="findings">⌕　查核發現</button>
+        <button class="nav-btn" data-view="backup">⇩　備份與還原</button>
+      </nav>
+      <div class="privacy">🔒 完全離線運作<br><small>案件資料僅儲存在本機瀏覽器</small></div>
+    </aside>
+
+    <main>
+      <header class="topbar">
+        <div>
+          <div class="eyebrow">目前案件</div>
+          <select id="caseSelector"></select>
+        </div>
+        <div class="top-actions">
+          <button id="editCaseBtn">✎ 編輯案件</button>
+          <button id="quickEventBtn" class="primary">＋ 新增紀錄</button>
+        </div>
+      </header>
+
+      <section id="dashboard" class="view active">
+        <div class="page-title"><div><h1>案件總覽</h1><p>掌握案件進度、問題風險與待辦事項。</p></div></div>
+        <div class="stats">
+          <article><span>📁</span><strong id="statEvents">0</strong><small>大事記</small></article>
+          <article><span>⚠</span><strong id="statIssues">0</strong><small>問題事項</small></article>
+          <article><span>🔴</span><strong id="statHigh">0</strong><small>高風險</small></article>
+          <article><span>✓</span><strong id="statOpen">0</strong><small>待追蹤</small></article>
+        </div>
+        <div class="grid two">
+          <section class="card"><div class="card-head"><h2>案件資訊</h2></div><div id="caseInfo"></div></section>
+          <section class="card"><div class="card-head"><h2>最近活動</h2><button data-view-go="timeline">查看全部</button></div><div id="recentEvents" class="compact-list"></div></section>
+        </div>
+        <div class="grid two">
+          <section class="card"><div class="card-head"><h2>問題風險</h2></div><div id="riskSummary"></div></section>
+          <section class="card"><div class="card-head"><h2>待追蹤事項</h2></div><div id="followups" class="compact-list"></div></section>
+        </div>
+      </section>
+
+      <section id="timeline" class="view">
+        <div class="page-title"><div><h1>審計大事記</h1><p>依時間完整記錄案件的重要事件、查核過程與溝通事項。</p></div><button class="primary" id="addEventBtn">＋ 新增大事記</button></div>
+        <div id="timelineList" class="timeline"></div>
+      </section>
+
+      <section id="issues" class="view">
+        <div class="page-title"><div><h1>問題分析</h1><p>將問題、原因、風險與後續處理集中管理。</p></div><button class="primary" id="addIssueBtn">＋ 新增問題</button></div>
+        <div id="issueList" class="issue-grid"></div>
+      </section>
+
+
+      <section id="evidence" class="view">
+        <div class="page-title"><div><h1>證據管理</h1><p>建立證據編號，並關聯至問題與查核程序。</p></div><button class="primary" id="addEvidenceBtn">＋ 新增證據</button></div>
+        <div id="evidenceList" class="finding-list"></div>
+      </section>
+
+      <section id="procedures" class="view">
+        <div class="page-title"><div><h1>查核程序</h1><p>管理查核目的、程序、所需資料與執行進度。</p></div><button class="primary" id="addProcedureBtn">＋ 新增程序</button></div>
+        <div id="procedureList" class="finding-list"></div>
+      </section>
+
+      <section id="workpaper" class="view">
+        <div class="page-title"><div><h1>審計工作底稿</h1><p>依案件資料自動彙整，可列印或另存 PDF。</p><button id="printWorkpaperBtn" class="primary">🖨 列印／另存 PDF</button></div></div>
+        <div id="workpaperContent" class="workpaper"></div>
+      </section>
+      <section id="findings" class="view">
+        <div class="page-title"><div><h1>查核發現</h1><p>串聯問題、證據、法規依據與改善建議。</p></div><button class="primary" id="addFindingBtn">＋ 新增查核發現</button></div>
+        <div id="findingList" class="finding-list"></div>
+      </section>
+
+      <section id="backup" class="view">
+        <div class="page-title"><div><h1>備份與還原</h1><p>資料不會上傳。請定期將案件匯出為 JSON 備份。</p></div></div>
+        <div class="grid two">
+          <section class="card action-card"><h2>⬇ 匯出完整資料</h2><p>將所有案件、大事記、問題與查核發現下載為 JSON。</p><button class="primary" id="exportBtn">匯出備份</button></section>
+          <section class="card action-card"><h2>⬆ 匯入備份</h2><p>從先前匯出的 JSON 還原資料。匯入後會覆蓋目前資料。</p><input type="file" id="importFile" accept=".json" hidden><button id="importBtn">選擇 JSON 檔案</button></section>
+        </div>
+        <section class="card danger-zone"><h2>⚠ 資料管理</h2><p>清除目前瀏覽器中的所有 AuditFlow 資料，此動作無法復原。</p><button id="clearAllBtn" class="danger">清除所有本機資料</button></section>
+      </section>
+    </main>
+  </div>
+
+  <div class="modal hidden" id="modal"><div class="modal-box"><button class="close" id="closeModal">×</button><h2 id="modalTitle"></h2><form id="modalForm"></form></div></div>
+  <div id="toast"></div>
+  <script src="app.js"></script>
+</body>
+</html>
