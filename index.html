@@ -164,10 +164,16 @@
       </section>
 
       <section id="backup" class="view">
-        <div class="page-title"><div><h1>備份與還原</h1><p>資料不會上傳。請定期將案件匯出為 JSON 備份。</p></div></div>
+        <div class="page-title"><div><h1>備份與還原</h1><p>資料不會上傳，只存在這個瀏覽器裡——一旦清除瀏覽器的 Cookie／快取／網站資料，所有內容就會消失。請定期將專案匯出為 JSON 備份檔，保存在你自己的電腦或雲端硬碟，需要時可以完整還原。</p></div></div>
         <div class="grid two">
-          <section class="card action-card"><h2>⬇ 匯出完整資料</h2><p>將所有案件、大事記、問題與查核發現下載為 JSON。</p><button class="primary" id="exportBtn">匯出備份</button></section>
-          <section class="card action-card"><h2>⬆ 匯入備份</h2><p>從先前匯出的 JSON 還原資料。匯入後會覆蓋目前資料。</p><input type="file" id="importFile" accept=".json" hidden><button id="importBtn">選擇 JSON 檔案</button></section>
+          <section class="card action-card">
+            <h2>⬇ 匯出專案備份</h2>
+            <p>將所有案件、大事記、查核計畫大事記、問題、查核程序、證據、查核發現與附件下載為 JSON。</p>
+            <label class="export-key-option"><input type="checkbox" id="exportIncludeKey" checked> 同時匯出已儲存的 Gemini API 金鑰（還原時會自動填回，不用重新貼一次）</label>
+            <div class="ai-note">⚠️ 勾選上面的選項後，匯出的 JSON 檔會包含你的 API 金鑰明碼，請將備份檔存放在安全的地方，不要隨意分享給他人；若要把備份給別人看，匯出前請先取消勾選。</div>
+            <button class="primary" id="exportBtn">匯出備份</button>
+          </section>
+          <section class="card action-card"><h2>⬆ 匯入備份</h2><p>從先前匯出的 JSON 還原資料；如果備份檔裡有包含 API 金鑰，也會一併還原。匯入後會覆蓋目前的專案內容。</p><input type="file" id="importFile" accept=".json" hidden><button id="importBtn">選擇 JSON 檔案</button></section>
         </div>
         <section class="card danger-zone"><h2>⚠ 資料管理</h2><p>清除目前瀏覽器中的所有 AuditFlow 資料，此動作無法復原。</p><button id="clearAllBtn" class="danger">清除所有本機資料</button></section>
       </section>

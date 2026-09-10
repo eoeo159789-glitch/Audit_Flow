@@ -241,7 +241,32 @@ window.closeModal=closeModal;$("#closeModal").onclick=closeModal;$("#modal").onc
 $("#newCaseBtn").onclick=()=>caseForm();$("#addAttachmentBtn").onclick=()=>attachmentForm();$("#relationRefreshBtn").onclick=()=>renderRelations();$("#editCaseBtn").onclick=()=>caseForm(active());$("#quickEventBtn").onclick=()=>eventForm();$("#addEventBtn").onclick=()=>eventForm();$("#addIssueBtn").onclick=()=>issueForm();$("#addFindingBtn").onclick=()=>findingForm();$("#addEvidenceBtn").onclick=()=>evidenceForm();$("#addProcedureBtn").onclick=()=>procedureForm();$("#addPlanEventBtn").onclick=()=>planEventForm();$("#caseSelector").onchange=e=>{activeCaseId=e.target.value;aiChatId=null;aiChatHistory=[];renderAll()};
 document.querySelectorAll(".nav-btn").forEach(b=>b.onclick=()=>showView(b.dataset.view));document.querySelectorAll("[data-view-go]").forEach(b=>b.onclick=()=>showView(b.dataset.viewGo));function showView(v){document.querySelectorAll(".view").forEach(x=>x.classList.toggle("active",x.id===v));document.querySelectorAll(".nav-btn").forEach(x=>x.classList.toggle("active",x.dataset.view===v))}
 window.editEvent=id=>eventForm(active().events.find(x=>x.id===id));window.editIssue=id=>issueForm(active().issues.find(x=>x.id===id));window.editFinding=id=>findingForm(active().findings.find(x=>x.id===id));window.editEvidence=id=>evidenceForm(active().evidence.find(x=>x.id===id));window.editProcedure=id=>procedureForm(active().procedures.find(x=>x.id===id));window.deleteItem=(key,id)=>{if(confirm("確定刪除？")){active()[key]=active()[key].filter(x=>x.id!==id);save()}};
-$("#exportBtn").onclick=()=>{let b=new Blob([JSON.stringify(data,null,2)],{type:"application/json"}),a=document.createElement("a");a.href=URL.createObjectURL(b);a.download=`AuditFlow_V2_Backup_${new Date().toISOString().slice(0,10)}.json`;a.click();URL.revokeObjectURL(a.href);toast("備份已匯出")};$("#importBtn").onclick=()=>$("#importFile").click();$("#importFile").onchange=async e=>{let f=e.target.files[0];if(!f)return;try{let p=JSON.parse(await f.text());if(!Array.isArray(p.cases))throw 0;if(confirm("匯入將覆蓋目前資料，確定嗎？")){data=p;activeCaseId=p.cases[0]?.id;save();toast("資料已還原")}}catch{x=0;alert("檔案格式不正確")}};$("#clearAllBtn").onclick=()=>{if(confirm("確定永久清除？")){data={cases:[]};activeCaseId=null;localStorage.removeItem(KEY);renderAll()}};
+$("#exportBtn").onclick=()=>{
+ let payload={cases:data.cases,__meta:{app:"AuditFlow",exportedAt:new Date().toISOString()}};
+ let includeKey=$("#exportIncludeKey").checked,key=geminiKey();
+ if(includeKey&&key)payload.__settings={geminiApiKey:key};
+ let b=new Blob([JSON.stringify(payload,null,2)],{type:"application/json"}),a=document.createElement("a");a.href=URL.createObjectURL(b);a.download=`AuditFlow_V2_Backup_${new Date().toISOString().slice(0,10)}.json`;a.click();URL.revokeObjectURL(a.href);
+ toast(includeKey&&key?"專案備份（含 API 金鑰）已匯出":"專案備份已匯出")
+};
+$("#importBtn").onclick=()=>$("#importFile").click();
+$("#importFile").onchange=async e=>{
+ let f=e.target.files[0];if(!f)return;
+ try{
+  let p=JSON.parse(await f.text());
+  if(!Array.isArray(p.cases))throw 0;
+  if(confirm("匯入將覆蓋目前的專案內容，確定嗎？")){
+   data={cases:p.cases};
+   activeCaseId=p.cases[0]?.id;
+   aiChatId=null;aiChatHistory=[];
+   let restoredKey=p.__settings?.geminiApiKey;
+   if(restoredKey)localStorage.setItem(GEMINI_KEY_STORAGE,restoredKey);
+   save();
+   renderGeminiKeyStatus();
+   toast(restoredKey?"專案資料與 API 金鑰皆已還原":"專案資料已還原")
+  }
+ }catch{alert("檔案格式不正確")}
+ e.target.value="";
+};$("#clearAllBtn").onclick=()=>{if(confirm("確定永久清除？")){data={cases:[]};activeCaseId=null;localStorage.removeItem(KEY);renderAll()}};
 $("#printWorkpaperBtn").onclick=()=>window.print();
 $("#timelineViewToggle").addEventListener("click",e=>{
  let b=e.target.closest(".tv-btn");if(!b)return;
