@@ -22,9 +22,10 @@
 <button class="nav-btn" data-view="relations">🕸　案件關聯圖</button>
 <button class="nav-btn" data-view="attachments">📎　附件資料</button>
         <button class="nav-btn" data-view="findings">⌕　查核發現</button>
+        <button class="nav-btn" data-view="ai">🤖　AI 分析</button>
         <button class="nav-btn" data-view="backup">⇩　備份與還原</button>
       </nav>
-      <div class="privacy">🔒 完全離線運作<br><small>案件資料僅儲存在本機瀏覽器</small></div>
+      <div class="privacy">🔒 案件資料完全離線<br><small>僅儲存在本機瀏覽器；若使用「AI 分析」功能，送出分析的內容才會連線至 Google Gemini</small></div>
     </aside>
 
     <main>
@@ -125,6 +126,31 @@
       <section id="findings" class="view">
         <div class="page-title"><div><h1>查核發現</h1><p>串聯問題、證據、法規依據與改善建議。</p></div><button class="primary" id="addFindingBtn">＋ 新增查核發現</button></div>
         <div id="findingList" class="finding-list"></div>
+      </section>
+
+      <section id="ai" class="view">
+        <div class="page-title"><div><h1>AI 智慧分析</h1><p>使用你自己的 Gemini API 金鑰，讓 AI 協助檢視問題的根本原因、查核程序與風險評估建議。</p></div></div>
+
+        <section class="card ai-settings-card">
+          <div class="card-head"><h2>Gemini API 金鑰設定</h2></div>
+          <div class="ai-key-row">
+            <input type="password" id="geminiKeyInput" placeholder="貼上你的 Gemini API Key（例如 AIza...）" autocomplete="off">
+            <button id="saveGeminiKeyBtn" class="primary">儲存金鑰</button>
+            <button id="clearGeminiKeyBtn">清除金鑰</button>
+          </div>
+          <div id="geminiKeyStatus" class="ai-key-status"></div>
+          <div class="ai-note">🔒 金鑰只會存在「這個瀏覽器」的本機儲存空間，不會上傳到任何伺服器；按下「產生 AI 分析」時，會由你的瀏覽器直接連線到 Google Gemini API 送出資料。若你的 Google Cloud 專案已啟用計費（預付額度有餘額），Google 官方承諾不會使用這些內容訓練模型；若使用免費額度的金鑰，內容有可能被用於改善 Google 產品，請避免在免費額度上送出機敏案件資料。</div>
+        </section>
+
+        <section class="card">
+          <div class="card-head"><h2>選擇要分析的問題</h2></div>
+          <div id="aiIssueControls" class="relation-controls"></div>
+        </section>
+
+        <section class="card">
+          <div class="card-head"><h2>AI 分析結果</h2><button class="primary" id="runAiAnalysisBtn">✨ 產生 AI 分析</button></div>
+          <div id="aiResult" class="ai-result">尚未產生分析。選擇上方問題後按「產生 AI 分析」。</div>
+        </section>
       </section>
 
       <section id="backup" class="view">
