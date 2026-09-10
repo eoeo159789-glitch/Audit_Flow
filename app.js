@@ -4,7 +4,7 @@ const GEMINI_KEY_STORAGE="auditflow_gemini_api_key";
 const GEMINI_MODEL="gemini-3.8-flash"; // 若 Google 更新模型名稱，改這裡即可
 const GEMINI_ENDPOINT="https://generativelanguage.googleapis.com/v1beta/interactions";
 const $=s=>document.querySelector(s), uid=()=>Date.now().toString(36)+Math.random().toString(36).slice(2,7);
-let data=load(),activeCaseId=null,modalContext=null,tgSelectedId=null,planFilterName=null,aiSelectedIssueId=null;
+let data=load(),activeCaseId=null,modalContext=null,tgSelectedId=null,planFilterName=null,aiSelectedIssueId=null,aiChatId=null,aiChatHistory=[];
 function load(){try{const d=JSON.parse(localStorage.getItem(KEY)||localStorage.getItem("auditflow_offline_v1"));if(d?.cases)return d}catch(e){}return{cases:[]}}
 function esc(s=""){return String(s).replace(/[&<>"']/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[m]))}
 function save(){localStorage.setItem(KEY,JSON.stringify(data));renderAll()}
@@ -21,7 +21,7 @@ let h=issues.filter(i=>i.risk==="高").length,m=issues.filter(i=>i.risk==="中")
 let op=issues.filter(i=>i.status!=="已結案");$("#followups").innerHTML=op.length?op.map(i=>`<div class="compact-item"><strong>${esc(i.title)}</strong><small><span class="badge ${riskClass(i.risk)}">${i.risk}風險</span>　${esc(i.status)}</small></div>`).join(""):empty("目前沒有待追蹤問題")}
 function renderTimeline(){let list=[...active().events].sort((a,b)=>b.date.localeCompare(a.date));$("#timelineList").innerHTML=list.length?list.map(e=>`<article class="timeline-item"><div class="item-meta">${esc(e.date)}｜${esc(e.category)}｜重要性：${esc(e.importance)}</div><strong>${esc(e.title)}</strong><p>${esc(e.description)}</p><div class="item-actions"><button onclick="editEvent('${e.id}')">編輯</button><button onclick="deleteItem('events','${e.id}')">刪除</button></div></article>`).join(""):empty("尚無紀錄")}
 function renderIssues(){let c=active(),list=c.issues;$("#issueList").innerHTML=list.length?list.map(i=>{let whys=[1,2,3,4,5].filter(n=>i["why"+n]).map(n=>`<div class="why-row"><b>Why ${n}</b><span>${esc(i["why"+n])}</span></div>`).join("");let cats=["人員","制度","流程","法規","預算","資料","管理","其他"].filter(x=>i["fish_"+x]).map(x=>`<span class="badge open">${esc(x)}：${esc(i["fish_"+x])}</span>`).join("");return `<article class="issue-card"><div class="meta-line"><span class="badge ${riskClass(i.risk)}">${esc(i.risk)}風險</span><span class="badge ${i.status==="已結案"?"closed":"open"}">${esc(i.status)}</span></div><h3>${esc(i.title)}</h3><p>${esc(i.description)}</p><div class="analysis-box"><h4>5 Why 分析</h4>${whys||"尚未填寫"}<h4>根本原因</h4><div class="root-cause">${esc(i.rootCause||"尚未填寫")}</div>${cats?`<h4>魚骨分析</h4><div class="relation">${cats}</div>`:""}</div><div class="item-actions"><button onclick="editIssue('${i.id}')">編輯</button><button onclick="deleteItem('issues','${i.id}')">刪除</button></div></article>`}).join(""):empty("尚無問題分析資料")}
-function renderFindings(){let list=active().findings;$("#findingList").innerHTML=list.length?list.map(f=>`<article class="finding"><h3>${esc(f.title)}</h3><dl><dt>問題描述</dt><dd>${esc(f.problem)}</dd><dt>查核方法／證據</dt><dd>${esc(f.evidence)}</dd><dt>法規或依據</dt><dd>${esc(f.basis)}</dd><dt>改善建議</dt><dd>${esc(f.recommendation)}</dd></dl><div class="item-actions"><button onclick="editFinding('${f.id}')">編輯</button><button onclick="deleteItem('findings','${f.id}')">刪除</button></div></article>`).join(""):empty("尚無查核發現")}
+function renderFindings(){let list=active().findings;$("#findingList").innerHTML=list.length?list.map(f=>{let issue=active().issues.find(i=>i.id===f.issueId);return `<article class="finding">${issue?`<div class="issue-ref">關聯問題：${esc(issue.title)}</div>`:""}<h3>${esc(f.title)}</h3><dl><dt>問題描述</dt><dd>${esc(f.problem)}</dd><dt>查核方法／證據</dt><dd>${esc(f.evidence)}</dd><dt>法規或依據</dt><dd>${esc(f.basis)}</dd><dt>改善建議</dt><dd>${esc(f.recommendation)}</dd></dl><div class="item-actions"><button onclick="editFinding('${f.id}')">編輯</button><button onclick="deleteItem('findings','${f.id}')">刪除</button></div></article>`}).join(""):empty("尚無查核發現")}
 function issueOptions(value=""){return `<option value="">未關聯問題</option>`+active().issues.map(i=>`<option value="${i.id}" ${i.id===value?"selected":""}>${esc(i.title)}</option>`).join("")}
 function renderEvidence(){let list=active().evidence;$("#evidenceList").innerHTML=list.length?list.map(e=>{let issue=active().issues.find(i=>i.id===e.issueId);return `<article class="finding"><div class="meta-line"><strong>${esc(e.code)}</strong><span class="badge open">${esc(e.type)}</span></div><h3>${esc(e.title)}</h3><p>${esc(e.description)}</p><div class="issue-ref">關聯問題：${issue?esc(issue.title):"未設定"}</div><div class="item-actions"><button onclick="editEvidence('${e.id}')">編輯</button><button onclick="deleteItem('evidence','${e.id}')">刪除</button></div></article>`}).join(""):empty("尚無證據資料")}
 function renderProcedures(){let list=active().procedures;$("#procedureList").innerHTML=list.length?list.map(p=>{let issue=active().issues.find(i=>i.id===p.issueId);return `<article class="finding"><div class="meta-line"><span class="badge ${p.status==="已完成"?"low":p.status==="執行中"?"medium":"open"}">${esc(p.status)}</span><span class="issue-ref">${issue?esc(issue.title):"未關聯問題"}</span></div><h3>${esc(p.title)}</h3><dl><dt>查核目的</dt><dd>${esc(p.objective)}</dd><dt>查核程序</dt><dd>${esc(p.steps)}</dd><dt>所需資料</dt><dd>${esc(p.documents)}</dd><dt>查核結果</dt><dd>${esc(p.result)}</dd></dl><div class="item-actions"><button onclick="editProcedure('${p.id}')">編輯</button><button onclick="deleteItem('procedures','${p.id}')">刪除</button></div></article>`}).join(""):empty("尚無查核程序")}
@@ -106,19 +106,11 @@ function renderAiIssueControls(){
  aiSelectedIssueId=issues.some(i=>i.id===aiSelectedIssueId)?aiSelectedIssueId:issues[0].id;
  el.innerHTML=issues.map((i,n)=>`<button class="${i.id===aiSelectedIssueId?"active":""}" data-aiid="${i.id}">P-${String(n+1).padStart(3,"0")} ${esc(i.title)}</button>`).join("");
 }
-function buildAuditPrompt(c,issue){
+function buildIssueContext(c,issue){
  let evs=c.evidence.filter(e=>e.issueId===issue.id),procs=c.procedures.filter(p=>p.issueId===issue.id),finds=c.findings.filter(f=>[f.issueId,f.relatedIssueId].includes(issue.id));
  let whys=[1,2,3,4,5].filter(n=>issue["why"+n]).map(n=>`Why ${n}：${issue["why"+n]}`).join("\n");
  let fish=["人員","制度","流程","法規","預算","資料","管理","其他"].filter(x=>issue["fish_"+x]).map(x=>`${x}：${issue["fish_"+x]}`).join("\n");
- return `你是一位資深內部稽核（審計）顧問。請根據以下審計案件的問題分析資料，用繁體中文提供專業意見，內容包含：
-1. 對目前 5-Why 分析與根本原因的評論，是否合理、是否有遺漏的角度
-2. 建議可以補充的查核程序（具體、可執行）
-3. 風險等級評估與理由（高／中／低）
-4. 具體可行的改善建議
-
-請只根據下方提供的資料進行分析，不要編造資料中沒有的具體數字、日期或事實；若資料不足以判斷，請直接說明需要補充哪些資訊。請用條列方式回答。
-
-【案件名稱】${c.name}
+ return `【案件名稱】${c.name}
 【受查單位】${c.agency||"未填寫"}
 【查核期間】${c.period||"未填寫"}
 
@@ -146,15 +138,29 @@ ${evs.length?evs.map(e=>`- ${e.code} ${e.title}：${e.description||"未填寫"}`
 【相關查核發現】
 ${finds.length?finds.map(f=>`- ${f.title}：${f.problem||"未填寫"}`).join("\n"):"尚無關聯查核發現"}`;
 }
-async function callGemini(prompt){
+function buildAuditPrompt(c,issue){
+ return `你是一位資深內部稽核（審計）顧問。請根據以下審計案件的問題分析資料，用繁體中文提供專業意見，內容包含：
+1. 對目前 5-Why 分析與根本原因的評論，是否合理、是否有遺漏的角度
+2. 建議可以補充的查核程序（具體、可執行）
+3. 風險等級評估與理由（高／中／低）
+4. 具體可行的改善建議
+
+請只根據下方提供的資料進行分析，不要編造資料中沒有的具體數字、日期或事實；若資料不足以判斷，請直接說明需要補充哪些資訊。請用條列方式回答。
+
+${buildIssueContext(c,issue)}`;
+}
+async function callGeminiApi({input,system_instruction,previous_interaction_id}){
  let key=geminiKey();
  if(!key)throw new Error("尚未設定 Gemini API 金鑰，請先在上方輸入並儲存。");
+ let payload={model:GEMINI_MODEL,input,generation_config:{thinking_level:"low"}};
+ if(system_instruction)payload.system_instruction=system_instruction;
+ if(previous_interaction_id)payload.previous_interaction_id=previous_interaction_id;
  let res;
  try{
   res=await fetch(GEMINI_ENDPOINT,{
    method:"POST",
    headers:{"Content-Type":"application/json","x-goog-api-key":key},
-   body:JSON.stringify({model:GEMINI_MODEL,system_instruction:"你是一位嚴謹、專業的內部稽核顧問，只根據使用者提供的資料進行分析，不編造未提及的具體事實。",input:prompt,generation_config:{thinking_level:"low"}})
+   body:JSON.stringify(payload)
   });
  }catch(networkErr){
   throw new Error("無法連線到 Gemini API。請檢查網路連線；若持續失敗，可能是瀏覽器 CORS 政策擋下了跨網域請求，屆時需要改用後端代理伺服器轉發請求。");
@@ -163,7 +169,33 @@ async function callGemini(prompt){
  if(!res.ok){throw new Error(`Gemini API 回傳錯誤（HTTP ${res.status}）：${body?.error?.message||"請確認金鑰是否正確、額度是否足夠。"}`)}
  let text=(body?.steps||[]).filter(s=>s.type==="model_output").flatMap(s=>s.content||[]).filter(c=>c.type==="text").map(c=>c.text).join("\n").trim();
  if(!text)throw new Error("Gemini 沒有回傳可用的文字內容，請稍後再試一次。");
- return text;
+ return {text,id:body?.id||null};
+}
+function renderAiChatLog(){
+ let el=$("#aiChatLog");if(!el)return;
+ el.innerHTML=aiChatHistory.length?aiChatHistory.map((m,idx)=>{
+  let actions=m.role==="ai"?`<div class="ai-chat-actions">
+   <button data-fill="rootcause" data-msgidx="${idx}">📥 填入根本原因</button>
+   <button data-fill="procedure" data-msgidx="${idx}">📥 新增為查核程序</button>
+   <button data-fill="finding" data-msgidx="${idx}">📥 新增為查核發現</button>
+  </div>`:"";
+  return `<div class="ai-chat-msg ${m.role}"><b>${m.role==="user"?"你":m.role==="error"?"⚠ 錯誤":"AI"}</b><div>${esc(m.text)}</div>${actions}</div>`;
+ }).join(""):empty("目前沒有對話，可以先「產生 AI 分析」，或直接在下方輸入問題。");
+ el.scrollTop=el.scrollHeight;
+}
+function resetAiChat(){aiChatId=null;aiChatHistory=[];renderAiChatLog()}
+function fillFromAiMessage(idx,target){
+ let msg=aiChatHistory[idx];if(!msg)return;
+ let c=active(),issue=c.issues.find(x=>x.id===aiSelectedIssueId);
+ if(!issue)return toast("找不到對應的問題，請先在上方選擇問題");
+ if(target==="rootcause"){
+  issue.rootCause=issue.rootCause&&issue.rootCause.trim()?`${issue.rootCause}\n\n【AI 建議】\n${msg.text}`:msg.text;
+  save();toast("已填入根本原因，可到「問題分析」查看");
+ }else if(target==="procedure"){
+  procedureForm({issueId:issue.id,title:"AI 建議查核程序",steps:msg.text});
+ }else if(target==="finding"){
+  findingForm({issueId:issue.id,title:"AI 建議查核發現",problem:issue.description||"",recommendation:msg.text});
+ }
 }
 function attachmentForm(a={}){
  let c=active();
@@ -185,7 +217,7 @@ window.downloadAttachment=id=>{
 }
 window.editAttachment=id=>attachmentForm(active().attachments.find(x=>x.id===id));
 
-function renderAll(){ensureCase();renderSelector();renderDashboard();renderTimeline();renderIssues();renderEvidence();renderProcedures();renderFindings();renderAttachments();renderRelations();renderWorkpaper();renderTimelineGraph();renderPlanEvents();renderAiIssueControls();renderGeminiKeyStatus()}
+function renderAll(){ensureCase();renderSelector();renderDashboard();renderTimeline();renderIssues();renderEvidence();renderProcedures();renderFindings();renderAttachments();renderRelations();renderWorkpaper();renderTimelineGraph();renderPlanEvents();renderAiIssueControls();renderGeminiKeyStatus();renderAiChatLog()}
 function openModal(title,html,ctx){modalContext=ctx;$("#modalTitle").textContent=title;$("#modalForm").innerHTML=html;$("#modal").classList.remove("hidden")}
 function closeModal(){$("#modal").classList.add("hidden")}
 function field(n,l,v="",type="text",cls=""){return type==="textarea"?`<div class="field ${cls}"><label>${l}</label><textarea name="${n}">${esc(v)}</textarea></div>`:`<div class="field ${cls}"><label>${l}</label><input type="${type}" name="${n}" value="${esc(v)}"></div>`}
@@ -196,7 +228,7 @@ function eventForm(e={}){openModal(e.id?"編輯大事記":"新增大事記",form
 function issueForm(i={}){let fish=["人員","制度","流程","法規","預算","資料","管理","其他"].map(x=>field("fish_"+x,"魚骨："+x,i["fish_"+x]||"","text")).join("");openModal(i.id?"編輯問題分析":"新增問題分析",formWrap([field("title","問題標題",i.title||"","text","full"),field("description","問題描述",i.description||"","textarea","full"),select("category","問題分類",i.category||"制度",["人員","制度","流程","資料","預算","管理","法規","其他"]),select("risk","風險等級",i.risk||"中",["高","中","低"]),select("status","處理狀態",i.status||"待追蹤",["待追蹤","查核中","已處理","已結案"]),... [1,2,3,4,5].map(n=>field("why"+n,"Why "+n,i["why"+n]||"","text","full")),field("rootCause","根本原因",i.rootCause||"","textarea","full"),fish]),{type:"issue",id:i.id})}
 function evidenceForm(e={}){openModal(e.id?"編輯證據":"新增證據",formWrap([field("code","證據編號",e.code||`E-${String(active().evidence.length+1).padStart(3,"0")}`),field("title","證據名稱",e.title||""),select("type","證據類型",e.type||"文件",["文件","函文","照片","現場紀錄","資料分析","其他"]),`<div class="field"><label>關聯問題</label><select name="issueId">${issueOptions(e.issueId)}</select></div>`,field("description","證據說明",e.description||"","textarea","full")]),{type:"evidence",id:e.id})}
 function procedureForm(p={}){openModal(p.id?"編輯查核程序":"新增查核程序",formWrap([field("title","程序名稱",p.title||"","text","full"),`<div class="field"><label>關聯問題</label><select name="issueId">${issueOptions(p.issueId)}</select></div>`,select("status","執行狀態",p.status||"尚未執行",["尚未執行","執行中","已完成"]),field("objective","查核目的",p.objective||"","textarea","full"),field("steps","查核程序",p.steps||"","textarea","full"),field("documents","所需資料",p.documents||"","textarea","full"),field("result","查核結果",p.result||"","textarea","full")]),{type:"procedure",id:p.id})}
-function findingForm(f={}){openModal(f.id?"編輯查核發現":"新增查核發現",formWrap([field("title","查核發現標題",f.title||"","text","full"),field("problem","問題描述",f.problem||"","textarea","full"),field("evidence","查核方法／證據",f.evidence||"","textarea","full"),field("basis","法規或依據",f.basis||"","textarea","full"),field("recommendation","改善建議",f.recommendation||"","textarea","full")]),{type:"finding",id:f.id})}
+function findingForm(f={}){openModal(f.id?"編輯查核發現":"新增查核發現",formWrap([field("title","查核發現標題",f.title||"","text","full"),`<div class="field"><label>關聯問題</label><select name="issueId">${issueOptions(f.issueId)}</select></div>`,field("problem","問題描述",f.problem||"","textarea","full"),field("evidence","查核方法／證據",f.evidence||"","textarea","full"),field("basis","法規或依據",f.basis||"","textarea","full"),field("recommendation","改善建議",f.recommendation||"","textarea","full")]),{type:"finding",id:f.id})}
 $("#modalForm").addEventListener("submit",async e=>{e.preventDefault();let fd=new FormData(e.target),o=Object.fromEntries(fd),c=active(),ctx=modalContext;if(ctx.type==="case"){if(ctx.id)Object.assign(data.cases.find(x=>x.id===ctx.id),o);else{data.cases.push({id:uid(),...o,events:[],issues:[],findings:[],evidence:[],procedures:[],planEvents:[]});activeCaseId=data.cases.at(-1).id}}else if(ctx.type==="attachment"){
  let arr=c.attachments||(c.attachments=[]), existing=ctx.id?arr.find(x=>x.id===ctx.id):null, file=fd.get("file");
  if(file && file.size>0){
@@ -206,7 +238,7 @@ $("#modalForm").addEventListener("submit",async e=>{e.preventDefault();let fd=ne
  if(existing)Object.assign(existing,o);else arr.push({id:uid(),...o});
 } else {let key={event:"events",issue:"issues",finding:"findings",evidence:"evidence",procedure:"procedures",planEvent:"planEvents"}[ctx.type],arr=c[key];ctx.id?Object.assign(arr.find(x=>x.id===ctx.id),o):arr.push({id:uid(),...o})}closeModal();save();toast("已儲存")})
 window.closeModal=closeModal;$("#closeModal").onclick=closeModal;$("#modal").onclick=e=>{if(e.target.id==="modal")closeModal()};
-$("#newCaseBtn").onclick=()=>caseForm();$("#addAttachmentBtn").onclick=()=>attachmentForm();$("#relationRefreshBtn").onclick=()=>renderRelations();$("#editCaseBtn").onclick=()=>caseForm(active());$("#quickEventBtn").onclick=()=>eventForm();$("#addEventBtn").onclick=()=>eventForm();$("#addIssueBtn").onclick=()=>issueForm();$("#addFindingBtn").onclick=()=>findingForm();$("#addEvidenceBtn").onclick=()=>evidenceForm();$("#addProcedureBtn").onclick=()=>procedureForm();$("#addPlanEventBtn").onclick=()=>planEventForm();$("#caseSelector").onchange=e=>{activeCaseId=e.target.value;renderAll()};
+$("#newCaseBtn").onclick=()=>caseForm();$("#addAttachmentBtn").onclick=()=>attachmentForm();$("#relationRefreshBtn").onclick=()=>renderRelations();$("#editCaseBtn").onclick=()=>caseForm(active());$("#quickEventBtn").onclick=()=>eventForm();$("#addEventBtn").onclick=()=>eventForm();$("#addIssueBtn").onclick=()=>issueForm();$("#addFindingBtn").onclick=()=>findingForm();$("#addEvidenceBtn").onclick=()=>evidenceForm();$("#addProcedureBtn").onclick=()=>procedureForm();$("#addPlanEventBtn").onclick=()=>planEventForm();$("#caseSelector").onchange=e=>{activeCaseId=e.target.value;aiChatId=null;aiChatHistory=[];renderAll()};
 document.querySelectorAll(".nav-btn").forEach(b=>b.onclick=()=>showView(b.dataset.view));document.querySelectorAll("[data-view-go]").forEach(b=>b.onclick=()=>showView(b.dataset.viewGo));function showView(v){document.querySelectorAll(".view").forEach(x=>x.classList.toggle("active",x.id===v));document.querySelectorAll(".nav-btn").forEach(x=>x.classList.toggle("active",x.dataset.view===v))}
 window.editEvent=id=>eventForm(active().events.find(x=>x.id===id));window.editIssue=id=>issueForm(active().issues.find(x=>x.id===id));window.editFinding=id=>findingForm(active().findings.find(x=>x.id===id));window.editEvidence=id=>evidenceForm(active().evidence.find(x=>x.id===id));window.editProcedure=id=>procedureForm(active().procedures.find(x=>x.id===id));window.deleteItem=(key,id)=>{if(confirm("確定刪除？")){active()[key]=active()[key].filter(x=>x.id!==id);save()}};
 $("#exportBtn").onclick=()=>{let b=new Blob([JSON.stringify(data,null,2)],{type:"application/json"}),a=document.createElement("a");a.href=URL.createObjectURL(b);a.download=`AuditFlow_V2_Backup_${new Date().toISOString().slice(0,10)}.json`;a.click();URL.revokeObjectURL(a.href);toast("備份已匯出")};$("#importBtn").onclick=()=>$("#importFile").click();$("#importFile").onchange=async e=>{let f=e.target.files[0];if(!f)return;try{let p=JSON.parse(await f.text());if(!Array.isArray(p.cases))throw 0;if(confirm("匯入將覆蓋目前資料，確定嗎？")){data=p;activeCaseId=p.cases[0]?.id;save();toast("資料已還原")}}catch{x=0;alert("檔案格式不正確")}};$("#clearAllBtn").onclick=()=>{if(confirm("確定永久清除？")){data={cases:[]};activeCaseId=null;localStorage.removeItem(KEY);renderAll()}};
@@ -221,7 +253,7 @@ $("#timelineViewToggle").addEventListener("click",e=>{
 });
 $("#timelineGraph").addEventListener("click",e=>{let n=e.target.closest("[data-tgid]");if(!n)return;tgSelectedId=n.dataset.tgid;renderTimelineGraph()});
 $("#planFilter").addEventListener("click",e=>{let b=e.target.closest("[data-plan]");if(!b)return;planFilterName=b.dataset.plan||null;renderPlanEvents()});
-$("#aiIssueControls").addEventListener("click",e=>{let b=e.target.closest("[data-aiid]");if(!b)return;aiSelectedIssueId=b.dataset.aiid;renderAiIssueControls()});
+$("#aiIssueControls").addEventListener("click",e=>{let b=e.target.closest("[data-aiid]");if(!b)return;aiSelectedIssueId=b.dataset.aiid;renderAiIssueControls();resetAiChat()});
 $("#saveGeminiKeyBtn").onclick=()=>{let v=$("#geminiKeyInput").value.trim();if(!v)return toast("請先輸入金鑰");localStorage.setItem(GEMINI_KEY_STORAGE,v);$("#geminiKeyInput").value="";renderGeminiKeyStatus();toast("金鑰已儲存在此瀏覽器")};
 $("#clearGeminiKeyBtn").onclick=()=>{if(confirm("確定要清除已儲存的 Gemini API 金鑰嗎？")){localStorage.removeItem(GEMINI_KEY_STORAGE);renderGeminiKeyStatus();toast("金鑰已清除")}};
 $("#runAiAnalysisBtn").onclick=async()=>{
@@ -230,12 +262,35 @@ $("#runAiAnalysisBtn").onclick=async()=>{
  let resultEl=$("#aiResult"),btn=$("#runAiAnalysisBtn");
  resultEl.className="ai-result loading";resultEl.textContent="AI 分析中，請稍候…（依內容長度可能需要數秒到數十秒）";btn.disabled=true;
  try{
-  let text=await callGemini(buildAuditPrompt(c,issue));
+  let {text,id}=await callGeminiApi({input:buildAuditPrompt(c,issue),system_instruction:"你是一位嚴謹、專業的內部稽核顧問，只根據使用者提供的資料進行分析，不編造未提及的具體事實。"});
   resultEl.className="ai-result";resultEl.innerHTML=esc(text);
+  aiChatId=id;aiChatHistory=[{role:"ai",text}];renderAiChatLog();
  }catch(err){
   resultEl.className="ai-result error";resultEl.textContent=err.message||"分析失敗，請稍後再試。";
  }finally{
   btn.disabled=false;
  }
 };
+$("#clearAiChatBtn").onclick=()=>resetAiChat();
+$("#aiChatLog").addEventListener("click",e=>{let b=e.target.closest("[data-fill]");if(!b)return;fillFromAiMessage(Number(b.dataset.msgidx),b.dataset.fill)});
+$("#aiChatForm").addEventListener("submit",async e=>{
+ e.preventDefault();
+ let c=active(),issue=c.issues.find(x=>x.id===aiSelectedIssueId);
+ if(!issue)return toast("請先選擇要提問的問題");
+ let input=$("#aiChatInput"),btn=$("#aiChatSendBtn"),q=input.value.trim();
+ if(!q)return;
+ aiChatHistory.push({role:"user",text:q});renderAiChatLog();
+ input.value="";input.disabled=true;btn.disabled=true;
+ try{
+  let result=aiChatId
+   ?await callGeminiApi({input:q,previous_interaction_id:aiChatId})
+   :await callGeminiApi({input:`${buildIssueContext(c,issue)}\n\n【使用者提問】${q}`,system_instruction:"你是一位資深稽核顧問，請根據上面提供的案件資料回答使用者的問題；若資料不足以回答，請直接說明需要補充哪些資訊，不要編造未提及的事實。"});
+  aiChatId=result.id;
+  aiChatHistory.push({role:"ai",text:result.text});
+ }catch(err){
+  aiChatHistory.push({role:"error",text:err.message||"提問失敗，請稍後再試。"});
+ }finally{
+  renderAiChatLog();input.disabled=false;btn.disabled=false;input.focus();
+ }
+});
 renderAll();

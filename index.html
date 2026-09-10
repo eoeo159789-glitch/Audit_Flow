@@ -151,6 +151,16 @@
           <div class="card-head"><h2>AI 分析結果</h2><button class="primary" id="runAiAnalysisBtn">✨ 產生 AI 分析</button></div>
           <div id="aiResult" class="ai-result">尚未產生分析。選擇上方問題後按「產生 AI 分析」。</div>
         </section>
+
+        <section class="card">
+          <div class="card-head"><h2>🗨 向 AI 追問</h2><button id="clearAiChatBtn">清空對話</button></div>
+          <p class="ai-chat-hint">可以先按上方「產生 AI 分析」再繼續追問，也可以直接在下方輸入問題（會自動帶入目前選擇的問題資料）。</p>
+          <div id="aiChatLog" class="ai-chat-log"></div>
+          <form id="aiChatForm" class="ai-chat-form">
+            <input type="text" id="aiChatInput" placeholder="輸入你想問 AI 的問題…" autocomplete="off">
+            <button type="submit" class="primary" id="aiChatSendBtn">送出提問</button>
+          </form>
+        </section>
       </section>
 
       <section id="backup" class="view">
